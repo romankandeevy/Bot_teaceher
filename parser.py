@@ -2,15 +2,7 @@ import feedparser
 import random
 import sqlite3
 from config import RSS_FEEDS
-
-DB_PATH = "used_articles.db"
-
-
-def init_db():
-    conn = sqlite3.connect(DB_PATH)
-    conn.execute("CREATE TABLE IF NOT EXISTS used (url TEXT PRIMARY KEY)")
-    conn.commit()
-    conn.close()
+from db import DB_PATH, init_db
 
 
 def is_used(url: str) -> bool:

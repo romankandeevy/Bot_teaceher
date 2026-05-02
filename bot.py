@@ -7,6 +7,7 @@ from aiogram.fsm.context import FSMContext
 from aiogram.fsm.state import State, StatesGroup
 from aiogram.fsm.storage.memory import MemoryStorage
 import config
+from db import init_db, get_setting, set_setting
 from scheduler import send_daily_post, deliver_post
 
 logging.basicConfig(level=logging.INFO)
@@ -21,16 +22,16 @@ class SetTime(StatesGroup):
 
 @dp.message(Command("start"))
 async def cmd_start(message: Message):
+    init_db()
     chat_id = str(message.chat.id)
+    set_setting("chat_id", chat_id)
 
-    if not config.CHAT_ID:
-        from dotenv import set_key
-        set_key(".env", "CHAT_ID", chat_id)
-        config.CHAT_ID = chat_id
+    h = int(get_setting("send_hour") or config.SEND_HOUR)
+    m = int(get_setting("send_minute") or config.SEND_MINUTE)
 
     await message.answer(
         "Привет! Я буду присылать тебе обучающие посты по стратегии и работе с топами.\n\n"
-        f"📅 Ежедневно в {config.SEND_HOUR:02d}:{config.SEND_MINUTE:02d}\n\n"
+        f"📅 Ежедневно в {h:02d}:{m:02d}\n\n"
         "Команды:\n"
         "/learn — получить пост прямо сейчас\n"
         "/settime — изменить время рассылки\n"
@@ -40,7 +41,9 @@ async def cmd_start(message: Message):
 
 @dp.message(Command("time"))
 async def cmd_time(message: Message):
-    await message.answer(f"Текущее время рассылки: {config.SEND_HOUR:02d}:{config.SEND_MINUTE:02d}")
+    h = int(get_setting("send_hour") or config.SEND_HOUR)
+    m = int(get_setting("send_minute") or config.SEND_MINUTE)
+    await message.answer(f"Текущее время рассылки: {h:02d}:{m:02d}")
 
 
 @dp.message(Command("settime"))
@@ -61,15 +64,8 @@ async def process_time(message: Message, state: FSMContext):
         await message.answer("Неверный формат. Введи время как ЧЧ:ММ, например 09:00")
         return
 
-    config.SEND_HOUR = hour
-    config.SEND_MINUTE = minute
-
-    try:
-        from dotenv import set_key
-        set_key(".env", "SEND_HOUR", str(hour))
-        set_key(".env", "SEND_MINUTE", str(minute))
-    except Exception:
-        pass
+    set_setting("send_hour", str(hour))
+    set_setting("send_minute", str(minute))
 
     await state.clear()
     await message.answer(f"Время рассылки изменено на {hour:02d}:{minute:02d}")
@@ -82,6 +78,7 @@ async def cmd_learn(message: Message):
 
 
 async def main():
+    init_db()
     asyncio.create_task(send_daily_post(bot))
     await dp.start_polling(bot)
 
